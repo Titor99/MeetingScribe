@@ -1,0 +1,29 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+.venv/
+.venv-broken-rog/
+.tools/
+
+# ---- 模型与运行数据（体积大 / 本机私有，不入库）----
+models/
+data/
+logs/
+browser-profile/
+test-audio/
+
+# ---- 构建产物 ----
+dist/
+installer-output/
+MeetingScribe.spec
+
+# ---- 本地配置与凭据（切勿提交）----
+config.json
+gh-user.json
+assets/*.pfx
+assets/*.cer
+
+# ---- 日志与历史启动脚本 ----
+*.log
+启动会议转写.bat
+package.json

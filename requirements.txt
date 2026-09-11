@@ -1,0 +1,10 @@
+# 会议实时转写系统依赖（Python 3.12）
+fastapi
+uvicorn
+websockets
+numpy
+sherpa-onnx
+sounddevice
+soxr
+# 桌面客户端（WebView2 窗口）
+pywebview

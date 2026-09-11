@@ -1,0 +1,28 @@
+{
+  "vad_threshold": 0.5,
+  "min_speech_duration": 0.25,
+  "min_silence_duration": 0.5,
+  "max_speech_duration": 15.0,
+  "speaker_threshold": 0.55,
+  "speaker_merge_threshold": 0.52,
+  "voiceprint_threshold": 0.6,
+  "new_speaker_min_duration": 1.2,
+  "speaker_change_split": true,
+  "num_threads": 4,
+  "device_keyword": "reSpeaker",
+  "llm": {
+    "base_url": "http://127.0.0.1:8080",
+    "api_key": "",
+    "model": "",
+    "temperature": 0.3,
+    "max_tokens": 4096,
+    "chunk_chars": 6000,
+    "request_timeout": 900
+  },
+  "diarization": {
+    "seg_model": "sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx",
+    "threshold": 0.7,
+    "merge_threshold": 0.65,
+    "min_cluster_seconds": 3.0
+  }
+}

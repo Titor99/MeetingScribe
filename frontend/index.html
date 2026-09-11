@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会议实时转写 · MeetingScribe</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- ============ 左侧：会议管理 ============ -->
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">🎙️</div>
+      <div>
+        <div class="brand-name">会议实时转写</div>
+        <div class="brand-sub">本地离线 · MeetingScribe</div>
+      </div>
+    </div>
+
+    <!-- 新建会议 -->
+    <section class="panel" id="panel-new">
+      <h2>开始新会议</h2>
+      <input id="inp-name" type="text" placeholder="会议名称（可选）">
+      <div class="dev-row">
+        <select id="sel-device"><option value="">自动选择录音设备</option></select>
+        <button class="tool" id="btn-dev-refresh" title="重新检测录音设备（新插入设备后点这里）">↻</button>
+      </div>
+      <button class="btn btn-primary" id="btn-start">▶ 开始会议</button>
+    </section>
+
+    <!-- 进行中会议控制 -->
+    <section class="panel hidden" id="panel-active">
+      <h2>会议进行中</h2>
+      <div class="active-name" id="active-name"></div>
+      <div class="active-timer" id="active-timer">00:00:00</div>
+      <div class="level-bar"><div class="level-fill" id="level-fill"></div></div>
+      <div class="listening" id="listening">待命中</div>
+      <div class="btn-row">
+        <button class="btn btn-warn" id="btn-pause">⏸ 暂停</button>
+        <button class="btn btn-go hidden" id="btn-resume">⏵ 继续</button>
+        <button class="btn btn-danger" id="btn-end">⏹ 结束会议</button>
+      </div>
+    </section>
+
+    <!-- 固定声纹库 -->
+    <section class="panel" id="panel-vp">
+      <h2>声纹库（已注册人员）</h2>
+      <div id="vp-list" class="vp-list"><div class="empty">暂无。开会后点击说话人标签上的 ☆ 存入</div></div>
+    </section>
+
+    <!-- 历史会议 -->
+    <section class="panel panel-history">
+      <h2>历史会议</h2>
+      <div id="meeting-list" class="meeting-list"><div class="empty">暂无记录</div></div>
+    </section>
+  </aside>
+
+  <!-- ============ 右侧：实时公屏 ============ -->
+  <main id="main">
+    <header id="topbar">
+      <div class="toolbar">
+        <div class="status-pill warn" id="status-pill"><span class="dot"></span><span id="pill-text">启动中…</span></div>
+        <input id="inp-search" type="search" placeholder="搜索转写内容">
+        <button class="tool" id="btn-settings" title="设置">⚙</button>
+      </div>
+    </header>
+
+    <!-- 历史会议操作栏（查看历史时显示） -->
+    <div id="history-bar" class="hidden">
+      <div class="aplayer" id="history-player">
+        <button class="aplay-btn" id="hp-play" title="播放 / 暂停">▶</button>
+        <span class="aplay-time" id="hp-cur">0:00</span>
+        <input type="range" class="aplay-seek" id="hp-seek" min="0" max="1000" value="0">
+        <span class="aplay-time" id="hp-dur">0:00</span>
+      </div>
+      <audio id="history-audio" preload="metadata" style="display:none"></audio>
+      <div class="hb-actions">
+        <button class="hb-btn" id="btn-hb-minutes">📝 生成 AI 纪要</button>
+        <button class="hb-btn hb-btn-sec" id="btn-hb-rediarize">🎚 重新分离说话人</button>
+        <a class="hb-link" id="hb-audio-dl" download>⬇ 录音</a>
+        <a class="hb-link" id="hb-txt-dl" download>⬇ 纪要 txt</a>
+        <a class="hb-link hidden" id="hb-md-dl" download>⬇ AI 纪要</a>
+      </div>
+    </div>
+
+    <div id="transcript" class="transcript">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">🎙️</div>
+        <h1>会议实时转写公屏</h1>
+        <p>全程本地运行，无需联网。点击左侧「开始会议」，<br>
+           每位参会者的每句话将实时转写并自动区分说话人。</p>
+      </div>
+    </div>
+
+    <!-- 会议结束总结 -->
+    <div id="summary-modal" class="modal hidden">
+      <div class="modal-card">
+        <h2>✅ 会议已结束</h2>
+        <div class="summary-grid" id="summary-grid"></div>
+        <div class="aplayer" id="summary-player">
+          <button class="aplay-btn" id="sp-play" title="播放 / 暂停">▶</button>
+          <span class="aplay-time" id="sp-cur">0:00</span>
+          <input type="range" class="aplay-seek" id="sp-seek" min="0" max="1000" value="0">
+          <span class="aplay-time" id="sp-dur">0:00</span>
+        </div>
+        <audio id="summary-audio" preload="metadata" style="display:none"></audio>
+        <div class="summary-files" id="summary-files"></div>
+        <button class="btn btn-go" id="btn-gen-minutes">📝 一键生成 AI 会议纪要</button>
+        <button class="btn btn-primary" id="btn-close-summary" style="margin-top:8px">关闭</button>
+      </div>
+    </div>
+
+    <!-- AI 纪要查看器 -->
+    <div id="minutes-modal" class="modal hidden">
+      <div class="modal-card minutes-card">
+        <h2 id="minutes-title">📝 AI 会议纪要</h2>
+        <div id="minutes-status" class="minutes-status hidden"></div>
+        <div id="minutes-body" class="minutes-body"></div>
+        <div class="minutes-actions">
+          <a class="hb-link hidden" id="minutes-download" download>⬇ 下载 .md</a>
+          <button class="hb-btn hidden" id="btn-minutes-regen">↻ 重新生成</button>
+          <button class="hb-btn" id="btn-close-minutes">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本地大模型未启动提示 -->
+    <div id="llm-modal" class="modal hidden">
+      <div class="modal-card">
+        <h2>⚠️ 本地大模型未启动</h2>
+        <p class="llm-tip">没有检测到大模型服务（<code id="llm-addr"></code>），暂时无法生成 AI 纪要。</p>
+        <p class="llm-tip">请先启动你的 LLM 服务（本地 llama.cpp / 云端 OpenAI 兼容接口均可），服务地址在 <code>config.json</code> 的 <code>llm.base_url</code> 中配置。例如本地 llama.cpp：</p>
+        <pre class="llm-cmd">llama-server -m "你的模型.gguf" --port 8080 -c 32768</pre>
+        <p class="llm-tip">启动成功后点击下方「重新检测」即可继续生成。</p>
+        <div class="btn-row">
+          <button class="btn btn-go" id="btn-llm-retry">🔄 重新检测</button>
+          <button class="btn btn-primary" id="btn-llm-close">稍后再说</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置抽屉（右侧滑出） -->
+    <div id="drawer-mask" class="drawer-mask hidden"></div>
+    <div id="settings-drawer" class="drawer hidden">
+      <div class="drawer-head">
+        <h2>⚙ 设置</h2>
+        <span class="drawer-close" id="btn-set-close" title="关闭">×</span>
+      </div>
+      <div class="drawer-body">
+        <section class="set-sec">
+          <h3>显示</h3>
+          <div class="set-row">
+            <span>转写字号</span>
+            <div class="seg-btns" id="set-font">
+              <button data-v="0" class="on">标准</button><button data-v="1">大</button><button data-v="2">特大</button>
+            </div>
+          </div>
+          <div class="set-row"><span>自动滚动到底部</span><span class="switch on" id="set-autoscroll"></span></div>
+          <div class="set-row"><span>显示时间戳</span><span class="switch on" id="set-timestamp"></span></div>
+          <div class="set-row"><span>全屏显示</span><button class="hb-btn hb-btn-sec" id="set-fullscreen">⛶ 切换全屏</button></div>
+        </section>
+        <section class="set-sec">
+          <h3>AI 纪要大模型</h3>
+          <p class="set-tip">用于「一键生成会议纪要」。默认调用本地服务（如 llama.cpp），也可改为 OpenAI 兼容的云端 API。</p>
+          <label>服务地址（base_url）</label>
+          <input id="set-base-url" type="text" placeholder="http://127.0.0.1:8080 或 https://api.deepseek.com">
+          <label>API Key（本地服务留空即可）</label>
+          <input id="set-api-key" type="password" placeholder="sk-...">
+          <label>模型名称（留空则自动取服务器上已加载的模型）</label>
+          <input id="set-model" type="text" placeholder="例如 deepseek-chat、qwen3-27b">
+          <div class="set-status" id="set-status"></div>
+          <button class="btn btn-go" id="btn-set-save" style="margin-top:6px">保存并检测</button>
+        </section>
+        <section class="set-sec">
+          <h3>关于</h3>
+          <p class="set-tip">MeetingScribe 会议实时转写 · 全程本地离线运行<br>
+            语音转写 SenseVoice · 声纹 3D-Speaker · 说话人分离 pyannote<br>
+            录音、转写、声纹数据均保存在本机</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- 说话人卡片（点击对话中的头像或姓名弹出） -->
+    <div id="speaker-card" class="modal hidden">
+      <div class="modal-card spk-card">
+        <div class="sc-head">
+          <div class="sc-avatar" id="sc-avatar">1</div>
+          <div class="sc-head-txt">
+            <div class="sc-title" id="sc-title">说话人 1</div>
+            <div class="sc-stats" id="sc-stats"></div>
+          </div>
+          <span class="drawer-close" id="btn-sc-close">×</span>
+        </div>
+        <label>姓名</label>
+        <input id="sc-name" type="text">
+        <label>角色（可选，如 主持人 / 产品经理）</label>
+        <input id="sc-role" type="text" placeholder="未设置">
+        <label>颜色</label>
+        <div class="sc-colors" id="sc-colors"></div>
+        <div class="btn-row">
+          <button class="btn btn-go" id="btn-sc-save">保存</button>
+          <button class="btn btn-primary hidden" id="btn-sc-enroll">☆ 登记到声纹库</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 声纹人员卡片（点击声纹库中的人员弹出） -->
+    <div id="vp-card" class="modal hidden">
+      <div class="modal-card spk-card">
+        <div class="sc-head">
+          <div class="sc-avatar" id="vc-avatar">声</div>
+          <div class="sc-head-txt">
+            <div class="sc-title" id="vc-title">声纹人员</div>
+            <div class="sc-stats" id="vc-stats"></div>
+          </div>
+          <span class="drawer-close" id="btn-vc-close">×</span>
+        </div>
+        <label>姓名</label>
+        <input id="vc-name" type="text">
+        <label>角色（可选）</label>
+        <input id="vc-role" type="text" placeholder="未设置">
+        <label>颜色</label>
+        <div class="sc-colors" id="vc-colors"></div>
+        <div class="btn-row">
+          <button class="btn btn-go" id="btn-vc-save">保存</button>
+          <button class="btn btn-danger" id="btn-vc-del">删除声纹</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通用输入弹窗（WebView2 不支持 window.prompt，改用应用内弹窗） -->
+    <div id="prompt-modal" class="modal hidden">
+      <div class="modal-card">
+        <h2 id="prompt-title" style="white-space:pre-line;font-size:15px"></h2>
+        <input id="prompt-input" type="text" style="width:100%;padding:9px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;margin:10px 0;box-sizing:border-box">
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btn-prompt-ok">确定</button>
+          <button class="btn" id="btn-prompt-cancel" style="background:var(--bg);color:var(--text);border:1px solid var(--border)">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
