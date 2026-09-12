@@ -1,6 +1,6 @@
 ; MeetingScribe 会议实时转写系统 - Inno Setup 安装脚本
 #define AppName "会议转写 MeetingScribe"
-#define AppVersion "1.3.1"
+#define AppVersion "1.0.0"
 #define AppExeName "Python\pythonw.exe"
 
 [Setup]
@@ -13,7 +13,7 @@ DefaultGroupName=会议转写
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
 OutputDir=installer-output
-OutputBaseFilename=MeetingScribe-Setup-1.3.1
+OutputBaseFilename=MeetingScribe-Setup-1.0.0
 SetupIconFile=assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico
 Compression=lzma2/fast
