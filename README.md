@@ -41,8 +41,8 @@
 
 **① 安装包 `MeetingScribe-Setup-x.x.x.exe`（约 290 MB，推荐）**
 
-- 双击一路下一步；安装到用户目录（`%LOCALAPPDATA%\Programs\MeetingScribe`），无需管理员权限
-- 可选创建桌面快捷方式，装完即可启动，自带卸载程序
+- 双击启动时请求一次管理员权限（UAC），默认安装到 `C:\Program Files\MeetingScribe`
+- 可选创建桌面快捷方式，装完即可启动，自带卸载程序；个人数据保存在文档目录，卸载默认保留
 
 **② 便携版 `MeetingScribe-Portable-x.x.x.zip`（约 283 MB）**
 
