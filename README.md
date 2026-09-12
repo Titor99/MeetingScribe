@@ -47,7 +47,7 @@
 **② 便携版 `MeetingScribe-Portable-x.x.x.zip`（约 283 MB）**
 
 - 解压到任意目录，双击文件夹内的 `启动会议转写.bat` 即可运行
-- 不写注册表、不产生系统依赖，删除文件夹即完成卸载；会议数据保存在软件目录 `data/` 下
+- 不写注册表、不产生系统依赖；个人数据同样保存在文档目录，删除软件文件夹不影响会议数据
 
 > Windows SmartScreen 若提示「未知发布者」，点击「仍要运行」即可（个人自签名证书）。
 
@@ -61,18 +61,18 @@
 
 ## 数据存储与卸载
 
-所有个人数据都保存在安装目录下，**卸载时不会被删除，重装后原样恢复**（已实测验证）：
+所有个人数据统一保存在 **「文档」文件夹下的 `MeetingScribe` 目录**（如 `C:\Users\<你>\Documents\MeetingScribe`，OneDrive 重定向的文档目录也能正确识别），与程序文件完全分离：
 
-| 数据 | 位置 | 卸载后 |
+| 数据 | 位置（文档\MeetingScribe 下） | 说明 |
 |---|---|---|
-| 会议存档（录音 + 转写 + AI 纪要） | `data\meetings\` | ✅ 保留 |
-| 声纹库（已注册人员） | `data\voiceprints.json` | ✅ 保留 |
-| 个人配置（LLM 地址/密钥、阈值等） | `config.json` | ✅ 保留（v1.3.1 起） |
-| 程序与模型 | 其余文件 | ❌ 删除 |
+| 会议存档 | `meetings\` | 每场会议：原始录音 + 逐句转写 + AI 纪要 |
+| 声纹库 | `voiceprints.json` | 已注册人员的声纹特征 |
+| 个人配置 | `config.json` | LLM 地址/密钥、各项阈值（首次启动自动生成） |
 
-- 安装包版默认目录：`%LOCALAPPDATA%\Programs\MeetingScribe`；便携版即解压目录
-- 重装时请保持**同一安装路径**，数据即可无缝衔接
-- 想彻底清除：卸载后手动删除上述目录即可；便携版删除文件夹会连同 `data\` 一起删掉，请提前备份
+- **卸载时默认保留个人数据**：卸载向导会显示「保留我的个人数据（推荐）」复选框，默认勾选；取消勾选才会在卸载时清空上述目录
+- 从旧版本升级时，首次启动会**自动把原安装目录下的数据迁移**到文档目录，无需手动操作
+- 重装、覆盖安装、换用便携版均不影响文档目录中的数据
+- 数据目录路径可在客户端「⚙ 设置 → 关于」中查看
 
 ## 技术架构（全离线）
 
@@ -142,7 +142,7 @@ curl -L -o models/eres2net_speaker.onnx \
 .venv\Scripts\python.exe backend\server.py --port 7100
 ```
 
-首次启动将 `config.example.json` 复制为 `config.json` 即可按需调整参数。
+首次启动会自动在「文档\MeetingScribe」下生成 `config.json`，按需修改即可（参考 `config.example.json` 的字段说明）。
 
 ## 打包安装包
 
@@ -192,8 +192,9 @@ sign-installer.ps1    安装包自签名脚本
 assets/               应用图标
 docs/screenshots/     界面截图
 models/               本地模型（需自行下载，见上文）
-data/meetings/        会议存档（按会议 ID 分目录，运行时生成）
 ```
+
+运行时个人数据（会议存档 / 声纹库 / config.json）保存在「文档\MeetingScribe」，见上文「数据存储与卸载」。
 
 ## 已知限制
 

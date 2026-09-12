@@ -27,10 +27,64 @@ if getattr(sys, "frozen", False):
 else:
     ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
-DATA_DIR = ROOT / "data" / "meetings"
 FRONTEND_DIR = ROOT / "frontend"
-CONFIG_PATH = ROOT / "config.json"
-VP_PATH = ROOT / "data" / "voiceprints.json"   # 固定声纹库
+
+
+def _documents_dir() -> Path:
+    """解析当前用户的「文档」目录（读注册表，兼容 OneDrive  Known Folder 重定向）。"""
+    try:
+        import winreg
+        with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") as k:
+            p = winreg.QueryValueEx(k, "Personal")[0]
+            if p:
+                return Path(p)
+    except Exception:
+        pass
+    return Path.home() / "Documents"
+
+
+# 个人数据根目录：文档\MeetingScribe（会议存档 / 声纹库 / 个人配置，卸载时默认保留）
+USER_DATA_DIR = _documents_dir() / "MeetingScribe"
+DATA_DIR = USER_DATA_DIR / "meetings"
+CONFIG_PATH = USER_DATA_DIR / "config.json"
+VP_PATH = USER_DATA_DIR / "voiceprints.json"   # 固定声纹库
+
+
+def _migrate_legacy_data():
+    """旧版本个人数据在安装目录下（data/ 与 config.json），首次启动自动迁移到文档目录。"""
+    legacy_dir = ROOT / "data"
+    try:
+        legacy_meetings = legacy_dir / "meetings"
+        if legacy_meetings.is_dir():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            for d in sorted(legacy_meetings.iterdir()):
+                tgt = DATA_DIR / d.name
+                if not tgt.exists():
+                    shutil.move(str(d), str(tgt))
+            try:
+                legacy_meetings.rmdir()  # 已全部搬走则删除空目录
+            except OSError:
+                pass
+        legacy_vp = legacy_dir / "voiceprints.json"
+        if legacy_vp.exists() and not VP_PATH.exists():
+            USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(legacy_vp), str(VP_PATH))
+        legacy_cfg = ROOT / "config.json"
+        if legacy_cfg.exists() and not CONFIG_PATH.exists():
+            USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(legacy_cfg), str(CONFIG_PATH))
+        try:
+            if legacy_dir.exists() and not any(legacy_dir.iterdir()):
+                legacy_dir.rmdir()
+        except OSError:
+            pass
+    except Exception:
+        pass
+
+
+_migrate_legacy_data()
 
 SAMPLE_RATE = 16000
 VAD_WINDOW = 512  # silero v4 @16kHz
@@ -84,6 +138,14 @@ def load_config():
                 else:
                     cfg[key] = dict(DEFAULT_CONFIG[key])
             cfg.update(user_cfg)
+        except Exception:
+            pass
+    else:
+        # 首次运行：生成一份默认配置到 文档\MeetingScribe\config.json，便于用户查阅修改
+        try:
+            USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
         except Exception:
             pass
     return cfg
@@ -1760,6 +1822,7 @@ class Server:
             "recorded_seconds": round(self._recorded_seconds(), 1),
             "speakers": self.pipeline.registry.public() if self.meeting else [],
             "llm_base_url": self.llm.base,
+            "data_dir": str(USER_DATA_DIR),
             "voiceprints": self.voiceprints.public(),
         }
 

@@ -148,6 +148,7 @@ function applyState(s) {
   updateStatusPill();
   if (s.device) setDevice(s.device, true);
   if (s.llm_base_url) state.llmBaseUrl = s.llm_base_url;
+  if (s.data_dir) { const el = $("about-datadir"); if (el) el.textContent = "数据目录：" + s.data_dir; }
   if (s.voiceprints) { state.voiceprints = s.voiceprints; renderVoiceprints(); }
   if (s.meeting && s.meeting.status !== "ended") {
     state.meeting = s.meeting;
