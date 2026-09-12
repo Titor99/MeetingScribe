@@ -35,13 +35,19 @@
 - **公屏工具**：全文搜索高亮、转写字号三档、自动滚动开关、时间戳开关，全部收纳于右侧设置抽屉
 - **录音设备管理**：自动识别 reSpeaker 等 USB 麦克风阵列，下拉手动切换，一键刷新新接入设备；模型 / 声纹 / 设备三项自检合并为右上角「已就绪」指示灯
 
-## 安装（推荐）
+## 安装
 
-前往 [Releases](../../releases) 下载最新 `MeetingScribe-Setup-x.x.x.exe`（约 290 MB），双击一路下一步即可：
+前往 [Releases](../../releases) 下载，两种方式任选（均已**内置**便携 Python 运行时与全部本地模型，无需安装任何环境）：
 
-- 安装包**已内置**便携 Python 运行时与全部本地模型，无需安装任何环境
-- 安装到用户目录（`%LOCALAPPDATA%\Programs\MeetingScribe`），无需管理员权限
-- 可选创建桌面快捷方式，装完即可启动
+**① 安装包 `MeetingScribe-Setup-x.x.x.exe`（约 290 MB，推荐）**
+
+- 双击一路下一步；安装到用户目录（`%LOCALAPPDATA%\Programs\MeetingScribe`），无需管理员权限
+- 可选创建桌面快捷方式，装完即可启动，自带卸载程序
+
+**② 便携版 `MeetingScribe-Portable-x.x.x.zip`（约 283 MB）**
+
+- 解压到任意目录，双击文件夹内的 `启动会议转写.bat` 即可运行
+- 不写注册表、不产生系统依赖，删除文件夹即完成卸载；会议数据保存在软件目录 `data/` 下
 
 > Windows SmartScreen 若提示「未知发布者」，点击「仍要运行」即可（个人自签名证书）。
 
