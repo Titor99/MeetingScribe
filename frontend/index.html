@@ -149,6 +149,17 @@
       </div>
       <div class="drawer-body">
         <section class="set-sec">
+          <h3>通用</h3>
+          <div class="set-row"><span>关闭窗口时</span>
+            <select id="set-close-action" class="set-select" style="width:auto">
+              <option value="ask">每次询问我</option>
+              <option value="tray">最小化到系统托盘</option>
+              <option value="exit">直接退出程序</option>
+            </select>
+          </div>
+          <p class="set-tip">选择「最小化到系统托盘」后，关闭窗口不会退出程序，双击托盘图标可重新打开</p>
+        </section>
+        <section class="set-sec">
           <h3>显示</h3>
           <div class="set-row">
             <span>转写字号</span>
@@ -167,8 +178,11 @@
           <input id="set-base-url" type="text" placeholder="http://127.0.0.1:8080 或 https://api.deepseek.com">
           <label>API Key（本地服务留空即可）</label>
           <input id="set-api-key" type="password" placeholder="sk-...">
-          <label>模型名称（留空则自动取服务器上已加载的模型）</label>
-          <input id="set-model" type="text" placeholder="例如 deepseek-chat、qwen3-27b">
+          <label>模型名称（填好地址和 Key 后自动检测，从下拉列表选择；选「自动」取服务器默认模型）</label>
+          <div class="model-row">
+            <select id="set-model" class="set-select"><option value="">自动（服务器默认）</option></select>
+            <button class="hb-btn hb-btn-sec" id="btn-model-refresh" title="重新检测模型列表">🔄</button>
+          </div>
           <div class="set-status" id="set-status"></div>
           <button class="btn btn-go" id="btn-set-save" style="margin-top:6px">保存并检测</button>
         </section>
@@ -179,6 +193,21 @@
             录音、转写、声纹数据均保存在本机</p>
           <p class="set-tip" id="about-datadir">数据目录：…</p>
         </section>
+      </div>
+    </div>
+
+    <!-- 关闭窗口选择弹窗（desktop_app.py 拦截关闭事件后触发 window.msAskClose） -->
+    <div id="close-mask" class="modal hidden" style="z-index:120">
+      <div class="modal-card" style="width:400px">
+        <h3 style="margin:0 0 4px">关闭 会议转写</h3>
+        <p class="set-tip" style="margin:0 0 10px">关闭窗口时，要如何使用会议转写？</p>
+        <label class="close-opt"><input type="radio" name="closeAct" value="tray" checked> 最小化到系统托盘（后台继续运行，双击托盘图标重新打开）</label>
+        <label class="close-opt"><input type="radio" name="closeAct" value="exit"> 退出程序</label>
+        <label class="close-opt"><input type="checkbox" id="close-remember"> 记住我的选择（可随时在「设置 → 通用」中修改）</label>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn btn-primary" id="btn-close-ok">确定</button>
+          <button class="btn" id="btn-close-cancel">取消</button>
+        </div>
       </div>
     </div>
 

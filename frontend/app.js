@@ -1006,6 +1006,50 @@ function toggleFullscreen() {
 }
 
 /* ---------------- 设置抽屉（右侧滑出） ---------------- */
+function fillModelOptions(models, current) {
+  const sel = $("set-model");
+  sel.innerHTML = "";
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = "自动（服务器默认）";
+  sel.appendChild(auto);
+  (models || []).forEach(m => {
+    const o = document.createElement("option");
+    o.value = m; o.textContent = m;
+    sel.appendChild(o);
+  });
+  if (current && !(models || []).includes(current)) {
+    const o = document.createElement("option");
+    o.value = current; o.textContent = current + "（已保存）";
+    sel.appendChild(o);
+  }
+  sel.value = current || "";
+}
+
+let _modelDetectTimer = null;
+function detectModels(showMsg) {
+  const base = $("set-base-url").value.trim();
+  const current = $("set-model").value;
+  if (!base) { fillModelOptions([], current); return; }
+  if (showMsg) $("set-status").textContent = "正在检测模型列表…";
+  api("/api/settings/llm/models", "POST", {
+    base_url: base,
+    api_key: $("set-api-key").value,
+  }).then(r => {
+    if (r.ok) {
+      fillModelOptions(r.models, current);
+      if (showMsg) $("set-status").textContent = `✅ 检测到 ${r.models.length} 个可用模型`;
+    } else {
+      fillModelOptions([], current);
+      if (showMsg) $("set-status").textContent = "⚠️ " + (r.error || "模型检测失败");
+    }
+  });
+}
+function scheduleDetectModels() {
+  clearTimeout(_modelDetectTimer);
+  _modelDetectTimer = setTimeout(() => detectModels(false), 800);
+}
+
 function openSettings() {
   $("settings-drawer").classList.remove("hidden");
   $("drawer-mask").classList.remove("hidden");
@@ -1013,8 +1057,12 @@ function openSettings() {
   api("/api/settings/llm").then(r => {
     $("set-base-url").value = r.base_url || "";
     $("set-api-key").value = r.api_key || "";
-    $("set-model").value = r.model || "";
+    fillModelOptions([], r.model || "");
     $("set-status").textContent = "";
+    if (r.base_url) detectModels(false);  // 打开设置时自动检测一次
+  });
+  api("/api/settings/client").then(r => {
+    $("set-close-action").value = r.close_action || "ask";
   });
 }
 function closeSettings() {
@@ -1049,6 +1097,31 @@ $("set-timestamp").onclick = () => {
 $("set-fullscreen").onclick = toggleFullscreen;
 
 /* 设置：AI 纪要大模型 */
+$("set-base-url").addEventListener("input", scheduleDetectModels);
+$("set-api-key").addEventListener("input", scheduleDetectModels);
+$("btn-model-refresh").onclick = () => detectModels(true);
+
+/* 设置：关闭窗口行为 */
+$("set-close-action").onchange = () => {
+  api("/api/settings/client", "POST", { close_action: $("set-close-action").value });
+};
+
+/* 关闭窗口选择弹窗（desktop_app.py closing 拦截后调用 msAskClose） */
+window.msAskClose = function () {
+  $("close-mask").classList.remove("hidden");
+};
+$("btn-close-cancel").onclick = () => {
+  $("close-mask").classList.add("hidden");
+};
+$("btn-close-ok").onclick = () => {
+  const act = (document.querySelector("input[name=closeAct]:checked") || {}).value || "tray";
+  const rem = $("close-remember").checked;
+  $("close-mask").classList.add("hidden");
+  if (window.pywebview && window.pywebview.api) {
+    window.pywebview.api.perform_close(act, rem);
+  }
+};
+
 $("btn-set-save").onclick = async () => {
   const btn = $("btn-set-save");
   btn.disabled = true;

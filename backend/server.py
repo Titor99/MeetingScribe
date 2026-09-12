@@ -99,6 +99,7 @@ DEFAULT_CONFIG = {
     "speaker_change_split": True,    # 长语音段内部再做说话人切换切分
     "num_threads": 4,
     "device_keyword": "reSpeaker",   # 自动匹配的录音设备名关键字
+    "close_action": "ask",           # 客户端关闭窗口行为：ask 每次询问 / tray 最小化到托盘 / exit 直接退出
     "llm": {
         "base_url": "http://127.0.0.1:8080",  # LLM 服务的 OpenAI 兼容地址（本地默认 llama.cpp）
         "api_key": "",               # API 密钥；本地服务一般留空，云端服务在此填写
@@ -322,6 +323,15 @@ class LLMClient:
             except Exception:
                 continue
         return False
+
+    def list_models(self):
+        """GET /v1/models 返回可用模型 id 列表；失败返回空列表"""
+        try:
+            with self._get("/v1/models", timeout=5) as r:
+                data = json.loads(r.read().decode("utf-8"))
+                return [m["id"] for m in (data.get("data") or []) if m.get("id")]
+        except Exception:
+            return []
 
     def model_name(self) -> str:
         if self.cfg.get("model"):
@@ -2022,6 +2032,49 @@ def create_app(server: Server):
                 req.base_url, req.api_key, req.model)}
         except Exception as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+    class LlmModelsReq(BaseModel):
+        base_url: str | None = None
+        api_key: str | None = None
+
+    @app.post("/api/settings/llm/models")
+    def list_llm_models(req: LlmModelsReq):
+        """用界面里填写的地址/Key（无需先保存）拉取该服务的可用模型列表"""
+        saved = server.cfg["llm"]
+        base = (req.base_url if req.base_url is not None else saved.get("base_url", "")).strip().rstrip("/")
+        key = saved.get("api_key", "") if req.api_key is None else req.api_key.strip()
+        if not base:
+            return {"ok": False, "models": [], "error": "服务地址为空"}
+        probe = LLMClient({"base_url": base, "api_key": key})
+        models = probe.list_models()
+        if not models:
+            return {"ok": False, "models": [],
+                    "error": "未获取到模型列表，请检查服务地址与 Key"}
+        return {"ok": True, "models": models}
+
+    @app.get("/api/settings/client")
+    def get_client_settings():
+        return {"close_action": server.cfg.get("close_action", "ask")}
+
+    class ClientSettingsReq(BaseModel):
+        close_action: str | None = None
+
+    @app.post("/api/settings/client")
+    def set_client_settings(req: ClientSettingsReq):
+        action = (req.close_action or "ask").strip()
+        if action not in ("ask", "tray", "exit"):
+            return JSONResponse({"ok": False, "error": "无效的关闭行为"}, status_code=400)
+        server.cfg["close_action"] = action
+        try:  # 持久化到 config.json（失败不影响本次生效）
+            disk = {}
+            if CONFIG_PATH.exists():
+                disk = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            disk["close_action"] = action
+            CONFIG_PATH.write_text(json.dumps(disk, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
+        except Exception:
+            pass
+        return {"ok": True, "close_action": action}
 
     @app.get("/api/meetings/{mid}/summary")
     def get_summary(mid: str):

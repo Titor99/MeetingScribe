@@ -6,5 +6,7 @@ numpy
 sherpa-onnx
 sounddevice
 soxr
-# 桌面客户端（WebView2 窗口）
+# 桌面客户端（WebView2 窗口 + 系统托盘）
 pywebview
+pystray
+pillow

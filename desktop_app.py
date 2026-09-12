@@ -7,6 +7,7 @@ MeetingScribe 桌面客户端入口
 - 用 Edge/Chrome 应用模式打开独立窗口（无浏览器边框，像原生应用）
 - 前端页面心跳看门狗：窗口关闭后自动停止服务
 """
+import json
 import os
 import runpy
 import subprocess
@@ -202,9 +203,117 @@ def watchdog_http():
             return True
 
 
+# ─── 窗口 / 托盘（参考 DocSearch run.py） ─────────────────────
+_WINDOW = None      # pywebview 窗口
+_TRAY = None        # pystray 托盘图标
+_FORCE_QUIT = False  # 托盘菜单「退出」置位，绕过关闭拦截
+
+
+def _client_close_action() -> str:
+    """从后端读取关闭行为配置：ask 每次询问 / tray 托盘 / exit 退出"""
+    d = http_json("/api/settings/client")
+    if d and d.get("close_action") in ("ask", "tray", "exit"):
+        return d["close_action"]
+    return "ask"
+
+
+def _show_window():
+    w = _WINDOW
+    if w is None:
+        return
+    try:
+        w.restore()  # 从最小化还原
+    except Exception:
+        pass
+    try:
+        w.show()     # 从托盘隐藏还原
+    except Exception:
+        pass
+
+
+def _hide_window():
+    try:
+        _WINDOW.hide()
+    except Exception:
+        pass
+
+
+def _ensure_tray():
+    """首次最小化到托盘时才创建托盘图标（双击图标打开窗口）"""
+    global _TRAY
+    if _TRAY is not None:
+        return
+    try:
+        import pystray
+        from PIL import Image
+        img = Image.open(ROOT / "assets" / "icon.png")
+        menu = pystray.Menu(
+            pystray.MenuItem("打开 会议转写", lambda icon, item: _show_window(), default=True),
+            pystray.MenuItem("退出", lambda icon, item: quit_app()))
+        _TRAY = pystray.Icon("MeetingScribe", img, "会议转写 MeetingScribe", menu)
+        _TRAY.run_detached()
+    except Exception as e:
+        print(f"托盘图标创建失败: {e}", flush=True)
+
+
+def quit_app():
+    """真正退出：托盘菜单「退出」调用"""
+    global _FORCE_QUIT
+    _FORCE_QUIT = True
+    try:
+        if _TRAY:
+            _TRAY.stop()
+    except Exception:
+        pass
+    try:
+        if _WINDOW:
+            _WINDOW.destroy()
+    except Exception:
+        pass
+
+
+def _on_closing():
+    """拦截窗口关闭：按 close_action（ask/tray/exit）决定去向。返回 False = 不关闭。
+    ask 时取消系统关闭，改为在页面内弹出选择框，选择结果经 js_api.perform_close 回来执行。"""
+    if _FORCE_QUIT:
+        return True
+    action = _client_close_action()
+    if action == "exit":
+        return True
+    if action == "tray":
+        _ensure_tray()
+        threading.Timer(0.05, _hide_window).start()
+        return False
+    # ask：必须异步派发 evaluate_js（closing 事件跑在界面主线程上，同步调用会自己等自己）
+    try:
+        threading.Timer(0.05, lambda: _WINDOW.evaluate_js(
+            "window.msAskClose && window.msAskClose()")).start()
+        return False
+    except Exception:
+        return True
+
+
 class SaveApi:
     """前端 js_api：下载文件时弹出 Windows 保存对话框，服务端流式写出，
-    避免大录音文件经 base64 穿过 JS 桥"""
+    避免大录音文件经 base64 穿过 JS 桥；另承载关闭确认弹窗的回调"""
+
+    def perform_close(self, action, remember):
+        """页面内关闭确认弹窗的回调（tray / exit / cancel）"""
+        if remember and action in ("tray", "exit"):
+            try:
+                req = urllib.request.Request(
+                    f"http://127.0.0.1:{PORT}/api/settings/client",
+                    data=json.dumps({"close_action": action}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}, method="POST")
+                urllib.request.urlopen(req, timeout=3)
+            except Exception:
+                pass
+        if action == "tray":
+            _ensure_tray()
+            threading.Timer(0.05, _hide_window).start()
+        elif action == "exit":
+            quit_app()
+        # cancel：什么都不做，窗口保持原样
 
     def save_file(self, url_path, filename=""):
         import re
@@ -248,16 +357,18 @@ class SaveApi:
 
 def run_webview():
     """优先用 WebView2 原生窗口（参考 DocSearch）：窗口生命周期由系统托管，
-    关闭窗口即返回，无需心跳兜底。环境不支持时返回 False 走浏览器方案。"""
+    关闭行为（托盘/退出/询问）由 _on_closing 拦截。环境不支持时返回 False 走浏览器方案。"""
+    global _WINDOW
     try:
         import webview
     except Exception as e:
         print(f"pywebview 不可用（{e}），回退到浏览器窗口", flush=True)
         return False
     try:
-        webview.create_window("会议转写 MeetingScribe", APP_URL,
-                              width=1280, height=900, min_size=(800, 600),
-                              js_api=SaveApi())
+        _WINDOW = webview.create_window("会议转写 MeetingScribe", APP_URL,
+                                        width=1280, height=900, min_size=(800, 600),
+                                        js_api=SaveApi())
+        _WINDOW.events.closing += _on_closing
         webview.start(gui="edgechromium", icon=str(ROOT / "assets" / "icon.ico"))
         return True
     except Exception as e:
