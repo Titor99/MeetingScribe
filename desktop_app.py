@@ -24,8 +24,17 @@ if getattr(sys, "frozen", False):
 else:
     ROOT = Path(__file__).resolve().parent
 
-LOG_DIR = ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+
+def _runtime_dir() -> Path:
+    """运行期可写目录（日志 / 浏览器缓存）。
+    安装到 C:\\Program Files 时 ROOT 对普通用户不可写，统一放到 %LOCALAPPDATA%\\MeetingScribe。"""
+    base = os.environ.get("LOCALAPPDATA")
+    return (Path(base) if base else Path.home() / "AppData" / "Local") / "MeetingScribe"
+
+
+RUNTIME_DIR = _runtime_dir()
+LOG_DIR = RUNTIME_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 _log = open(LOG_DIR / "app.log", "a", encoding="utf-8", buffering=1)
 sys.stdout = _log
 sys.stderr = _log
@@ -107,8 +116,8 @@ def open_app_window():
     if browser:
         # 独立 user-data-dir：强制新进程实例。
         # 否则 Edge/Chrome 已在运行时会把 --app 参数转发给已有进程并立即退出。
-        profile = ROOT / "browser-profile"
-        profile.mkdir(exist_ok=True)
+        profile = RUNTIME_DIR / "browser-profile"
+        profile.mkdir(parents=True, exist_ok=True)
         return subprocess.Popen([
             browser,
             f"--app={APP_URL}",

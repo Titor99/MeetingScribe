@@ -12,6 +12,7 @@ DefaultDirName={localappdata}\Programs\MeetingScribe
 DefaultGroupName=会议转写
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=installer-output
 OutputBaseFilename=MeetingScribe-Setup-1.3.1
 SetupIconFile=assets\icon.ico
@@ -42,16 +43,60 @@ Name: "{group}\卸载 会议转写"; Filename: "{uninstallexe}"
 [Run]
 Filename: "{app}\{#AppExeName}"; Parameters: "desktop_app.py"; WorkingDir: "{app}"; Description: "启动 会议转写"; Flags: nowait postinstall skipifsilent
 
-[UninstallDelete]
-Type: filesandordirs; Name: "{app}\logs"
-Type: filesandordirs; Name: "{app}\browser-profile"
-
 [Code]
 // 卸载向导：复选框「保留我的个人数据」，默认勾选。
 // 个人数据目录为 文档\MeetingScribe（会议存档/声纹库/个人配置）。
 // 静默卸载（/SILENT、/VERYSILENT）一律保留；测试删除路径可用 /DELETEUSERDATA。
 var
   KeepUserData: Boolean;
+
+// 判断是否需要删除个人数据（复选框取消勾选，或命令行 /DELETEUSERDATA）
+function WantDeleteUserData(): Boolean;
+var
+  i: Integer;
+begin
+  Result := not KeepUserData;
+  for i := 1 to ParamCount do
+    if CompareText(ParamStr(i), '/DELETEUSERDATA') = 0 then
+      Result := True;
+end;
+
+// 彻底清空安装目录：
+// - 勾选保留数据时，旧版本遗留在安装目录 data\ 下的个人数据先抢救到文档目录
+// - 之后删除安装目录全部内容（跳过卸载程序自身 unins*，由 Inno 自动删除）
+procedure CleanupAppDir();
+var
+  FindRec: TFindRec;
+  AppDir, Name, LegacyData, LegacyTarget: string;
+  LegacyKept: Boolean;
+begin
+  AppDir := ExpandConstant('{app}');
+  LegacyData := AppDir + '\data';
+  LegacyKept := False;
+  if KeepUserData and DirExists(LegacyData) then
+  begin
+    LegacyTarget := ExpandConstant('{userdocs}\MeetingScribe\data');
+    if DirExists(LegacyTarget) then
+      LegacyKept := True                      // 目标已存在，不覆盖，原地保留
+    else if not RenameFile(LegacyData, LegacyTarget) then
+      LegacyKept := True;                     // 移动失败（如跨盘），原地保留
+  end;
+  if FindFirst(AppDir + '\*', FindRec) then
+  begin
+    try
+      repeat
+        Name := FindRec.Name;
+        if (Name <> '.') and (Name <> '..') and
+           (Copy(Name, 1, 5) <> 'unins') and
+           not (LegacyKept and (CompareText(Name, 'data') = 0)) then
+          DelTree(AppDir + '\' + Name, True, True, True);
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+  RemoveDir(AppDir);
+end;
 
 procedure InitializeUninstallProgressForm();
 var
@@ -131,21 +176,16 @@ begin
   end;
 end;
 
-function WantDeleteUserData(): Boolean;
-var
-  i: Integer;
-begin
-  Result := not KeepUserData;
-  for i := 1 to ParamCount do
-    if CompareText(ParamStr(i), '/DELETEUSERDATA') = 0 then
-      Result := True;
-end;
-
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usPostUninstall then
   begin
     if WantDeleteUserData() then
       DelTree(ExpandConstant('{userdocs}\MeetingScribe'), True, True, True);
+    // 彻底清空安装目录（含运行时产生的日志/缓存/__pycache__ 等）
+    CleanupAppDir();
+    // 运行期目录（日志、浏览器缓存），与个人数据无关，始终清理
+    DelTree(ExpandConstant('{localappdata}\MeetingScribe'), True, True, True);
+    RemoveDir(ExpandConstant('{localappdata}\MeetingScribe'));
   end;
 end;
