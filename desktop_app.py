@@ -16,8 +16,45 @@ import time
 import urllib.request
 from pathlib import Path
 
-PORT = 7100
+PORT = 7100  # 首选端口；被其他程序占用时自动顺延（7101-7119）
 APP_URL = f"http://localhost:{PORT}/"
+
+
+def _is_our_service(port) -> bool:
+    """判断端口上跑的是不是本系统后端（而不是恰好返回 200 的其他服务，
+    例如 Vite 开发服务器对任意路径都会回 200 index.html）。"""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=1) as r:
+            if r.status != 200:
+                return False
+            import json as _json
+            d = _json.loads(r.read().decode("utf-8"))
+            return isinstance(d, dict) and "models_loaded" in d
+    except Exception:
+        return False
+
+
+def select_port() -> int:
+    """端口选择：
+    - 7100 上已是本系统服务 → 直接复用
+    - 7100 被其他程序占用 → 从 7101 起找第一个空闲端口"""
+    import socket
+    global PORT, APP_URL
+    if _is_our_service(7100):
+        return PORT
+    for p in range(7100, 7120):
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", p))
+            s.close()
+            if p != PORT:
+                print(f"端口 7100 被占用，改用 {p}", flush=True)
+            PORT = p
+            APP_URL = f"http://localhost:{p}/"
+            return p
+        except OSError:
+            continue
+    return PORT
 
 if getattr(sys, "frozen", False):
     ROOT = Path(sys.executable).resolve().parent
@@ -44,11 +81,7 @@ _box = {}
 
 
 def server_up() -> bool:
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/status", timeout=1) as r:
-            return r.status == 200
-    except Exception:
-        return False
+    return _is_our_service(PORT)
 
 
 def start_backend():
@@ -234,6 +267,7 @@ def run_webview():
 
 def main():
     print(f"[{time.strftime('%F %T')}] MeetingScribe 客户端启动", flush=True)
+    select_port()
     started_here = False
     if not server_up():
         start_backend()

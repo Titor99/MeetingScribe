@@ -2208,6 +2208,12 @@ def create_app(server: Server):
         finally:
             server.clients.discard(q)
 
+    @app.websocket("/{path:path}")
+    async def ws_reject(websocket: WebSocket):
+        # 兜底：其他路径的 WebSocket（如残留浏览器标签的 Vite HMR 重连）直接关闭，
+        # 避免落入 StaticFiles 触发 AssertionError 刷日志
+        await websocket.close(code=1008)
+
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="static")
     return app
 
