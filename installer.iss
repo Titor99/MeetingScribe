@@ -31,7 +31,9 @@ Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.i
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加选项:"
 
 [Files]
-Source: "dist\MeetingScribe\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\MeetingScribe\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "config.json"
+; 用户配置：已存在则不覆盖（重装保留），卸载时不删除
+Source: "dist\MeetingScribe\config.json"; DestDir: "{app}"; Flags: ignoreversion uninsneveruninstall onlyifdoesntexist
 
 [Icons]
 Name: "{autodesktop}\会议转写"; Filename: "{app}\{#AppExeName}"; Parameters: "desktop_app.py"; WorkingDir: "{app}"; IconFilename: "{app}\assets\icon.ico"; Tasks: desktopicon
